@@ -76,6 +76,8 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%;overscroll-beh
 @media (orientation:portrait){.cam{display:flex;flex-direction:column;justify-content:center;gap:16px;padding:60px 0 24px}.cam .vf{position:relative;top:auto;bottom:auto;left:auto;transform:none;height:auto;width:100%;flex:none}.cam .side{position:static;flex-direction:row;width:100%;justify-content:space-between;padding:0 16px}.cam .side:first-child,.cam .side:nth-child(3){left:auto;right:auto}}
 .grid .sel{outline:3px solid var(--or);outline-offset:-3px}
 .grid i{position:absolute;top:6px;left:6px;width:26px;height:26px;border-radius:50%;background:var(--or);color:#18181b;font-style:normal;font-weight:800;display:grid;place-items:center;font-size:14px}
+.top{position:relative;padding-right:76px}
+#back{position:absolute;top:18px;right:16px;width:48px;height:48px;font-size:24px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
 </style>
 </head>
 <body>
@@ -224,6 +226,19 @@ async function cam(){
   else{g.fillStyle=`hsl(${S.photos.length*37%360} 12% 22%)`;g.fillRect(0,0,1600,1200);g.fillStyle='#fff8';g.font='bold 80px sans-serif';g.textAlign='center';g.fillText(label,800,620)}
   const url=c.toDataURL('image/jpeg',.8),tilt=S.tilt;stopCam();next({label,url,tilt})};
 }
+const BACK={
+  s1:()=>go('home'),
+  s3:()=>{const n=SEQ[S.type].length;S.photos.pop();S.i=S.photos.length>=n?-1:S.photos.length;go('cam')},
+  s4:()=>go('s3'),
+  ad:()=>go('s4')
+};
+function addBack(){
+  const t=app.querySelector('.top'),f=BACK[S.step];
+  if(!t||!f)return;
+  t.insertAdjacentHTML('beforeend','<button id="back" aria-label="Terug">←</button>');
+  $('#back').onclick=f;
+}
+const d0=draw;draw=()=>{d0();addBack()};
 draw();
 </script>
 </body>
