@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#18181b">
 <title>Incheck prototype</title>
 <style>
 :root{--bg:#18181b;--panel:#27272a;--line:#3f3f46;--tx:#fafafa;--mute:#a1a1aa;--or:#f97316;--gr:#22c55e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -62,6 +66,13 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;min-height:48px;border
 .done svg{width:120px;stroke:var(--gr);fill:none;stroke-width:3;filter:drop-shadow(0 0 18px #22c55e99);margin:auto}
 .done p{font-size:26px;font-weight:800;margin:0}
 .fld input::placeholder{color:#52525b}
+.cam{position:fixed;inset:0;z-index:5;display:block;padding:0;background:#000}
+.cam .vf{position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);height:100%;width:auto;max-width:100%;flex:none;border-radius:0}
+.cam .side{position:absolute;top:0;bottom:0;z-index:2}
+.cam .side:first-child{left:max(12px,env(safe-area-inset-left))}
+.cam .side:nth-child(3){right:max(12px,env(safe-area-inset-right))}
+.cam .x{right:max(10px,env(safe-area-inset-right))}
+@media (orientation:portrait){.cam{display:flex;flex-direction:column;justify-content:center;gap:16px;padding:60px 0 24px}.cam .vf{position:relative;top:auto;bottom:auto;left:auto;transform:none;height:auto;width:100%;flex:none}.cam .side{position:static;flex-direction:row;width:100%;justify-content:space-between;padding:0 16px}.cam .side:first-child,.cam .side:nth-child(3){left:auto;right:auto}}
 .grid .sel{outline:3px solid var(--or);outline-offset:-3px}
 .grid i{position:absolute;top:6px;left:6px;width:26px;height:26px;border-radius:50%;background:var(--or);color:#18181b;font-style:normal;font-weight:800;display:grid;place-items:center;font-size:14px}
 </style>
@@ -108,7 +119,7 @@ function reqMotion(){try{const D=window.DeviceMotionEvent;if(D&&typeof D.request
 const tl=p=>p.tilt==null?'':Math.abs(p.tilt)<1.2?' <b style="color:var(--gr)">✓ recht</b>':' <b style="color:var(--or)">'+Math.abs(p.tilt).toFixed(1)+'° scheef</b>';
 function scanVin(){
  const ov=document.createElement('div');let r,done=false;
- ov.style.cssText='position:absolute;inset:0;z-index:9;background:#000;display:flex;flex-direction:column';
+ ov.style.cssText='position:fixed;inset:0;z-index:9;background:#000;display:flex;flex-direction:column';
  ov.innerHTML=`<div style="position:relative;flex:1;overflow:hidden"><video id="sv" playsinline muted style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;left:8%;right:8%;top:38%;height:24%;border:3px solid var(--or);border-radius:12px"></div><p id="svm" style="position:absolute;left:16px;right:16px;bottom:16px;margin:0;text-align:center;background:#000b;padding:10px;border-radius:10px">Richt de camera op de barcode van het ${S.type==='van'?'VIN':'chassisnummer'}.</p></div><div class="foot"><button class="cta" id="svx" style="background:var(--panel);color:var(--tx)">ANNULEREN</button></div>`;
  app.appendChild(ov);
  const close=()=>{try{r&&r.reset()}catch(e){}ov.remove()};
