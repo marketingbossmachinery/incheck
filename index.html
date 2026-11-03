@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -66,6 +66,7 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;min-height:48px;border
 .done svg{width:120px;stroke:var(--gr);fill:none;stroke-width:3;filter:drop-shadow(0 0 18px #22c55e99);margin:auto}
 .done p{font-size:26px;font-weight:800;margin:0}
 .fld input::placeholder{color:#52525b}
+html,body{touch-action:manipulation;-webkit-text-size-adjust:100%;overscroll-behavior:none}
 .cam{position:fixed;inset:0;z-index:5;display:block;padding:0;background:#000}
 .cam .vf{position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);height:100%;width:auto;max-width:100%;flex:none;border-radius:0}
 .cam .side{position:absolute;top:0;bottom:0;z-index:2}
@@ -83,15 +84,18 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;min-height:48px;border
 <script>
 const $=s=>document.querySelector(s),app=$('#app');
 const PEN='<svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>';
-const FV=[['vin','#V'],['merk','Merk'],['type','Type'],['model','Model'],['categorie','Categorie'],['eerste_registratie','Eerste registratie'],['kleur','Kleur'],['tellerstand','#T'],['btw_marge','BTW / marge'],['conditie','Conditie'],['brandstof','Brandstof'],
+const FV=[['vin','#V'],['kenteken','Kenteken'],['merk','Merk'],['type','Type'],['model','Model'],['categorie','Categorie'],['eerste_registratie','Eerste registratie'],['kleur','Kleur'],['tellerstand','#T'],['btw_marge','BTW / marge'],['conditie','Conditie'],['brandstof','Brandstof'],
 ['S','Afmetingen'],['lengte','Lengte'],['breedte','Breedte'],['hoogte','Hoogte'],['wielbasis','Wielbasis'],
 ['S','Gewichten'],['gvw','Max. gewicht'],['ledig','Ledig gewicht'],['laad','Laadvermogen'],['trek','Trekgewicht'],
 ['S','Motor en techniek'],['bak','Versnellingsbak'],['pk','Vermogen'],['euro','Emissieklasse'],['adblue','AdBlue','b'],
 ['S','Opties'],['airco','Airco','b'],['cam','Achteruitrijcamera','b'],['cruise','Cruise control','b'],['lat','Lat-betimmering','b']];
 const F=FV;
+const SAN={vin:v=>v.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g,'').slice(0,17),kenteken:v=>v.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8),chassisnummer:v=>v.toUpperCase().replace(/[^A-Z0-9]/g,'')};
+['gesturestart','gesturechange','gestureend'].forEach(n=>document.addEventListener(n,e=>e.preventDefault()));
+document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
 const FM=[['chassisnummer','Chassisnummer'],['categorie','Categorie'],['subcategorie','Subcategorie'],['merk','Merk'],['type','Type'],['sector','Sector'],['voortbeweging','Voortbeweging'],['chassis_type','Chassis type'],['conditie','Conditie'],['bouwjaar','Bouwjaar'],['draaiuren','Draaiuren'],['kilometerstand','Kilometerstand'],['kenteken','Kenteken'],['locatie','Locatie'],['S','Specificaties'],['gewicht','Gewicht'],['t_lengte','Transport lengte'],['t_breedte','Transport breedte'],['t_hoogte','Transport hoogte'],['t_notities','Transport notities'],['motor_merk','Motor merk'],['brandstof','Brandstof'],['motor_type','Motor type'],['cilinders','Aantal cilinders'],['vermogen','Vermogen'],['ce','Heeft CE?','b'],['epa','Heeft EPA?','b'],['banden','Banden configuratie'],['S','Rijwerk'],['sprocket','Sprocket'],['platen','Platen'],['ketting','Ketting'],['plaatwijdte','Plaatwijdte']];
 const EX={chassisnummer:'CAT0320GC12345',categorie:'Graafmachines',subcategorie:'Rupsgraafmachines',merk:'Caterpillar',type:'320 GC',sector:'Grond-, weg- en waterbouw',voortbeweging:'Rupsen',chassis_type:'Rupsonderstel',conditie:'Gebruikt',bouwjaar:'2019',draaiuren:'4250',kilometerstand:'0',gewicht:'22000 kg',t_lengte:'950 cm',t_breedte:'280 cm',t_hoogte:'300 cm',motor_merk:'Cat',brandstof:'Diesel',motor_type:'C4.4',cilinders:'4',vermogen:'121 PK',banden:'Rupsen',plaatwijdte:'600 mm'};
-const PH=()=>S.type==='van'?MOCK:EX;
+const PH=()=>S.type==='van'?{...MOCK,kenteken:'H123BC'}:EX;
 const fl=()=>S.type==='van'?FV:FM;
 const MOCK={vin:'WMA03VUY6P9019536',merk:'MAN',type:'TGE 3.140 2.0 TDI',model:'L3H3',categorie:'Gesloten bestelbus',eerste_registratie:'03-04-2023',kleur:'Wit',eenheid:'km',tellerstand:'145964',btw_marge:'BTW',conditie:'Gebruikt',brandstof:'Diesel',lengte:'615 cm',breedte:'204 cm',hoogte:'255 cm',wielbasis:'364 cm',gvw:'3500 kg',ledig:'2040 kg',laad:'1460 kg',trek:'2500 kg',bak:'Automaat',pk:'140 PK',euro:'Euro 6',adblue:'Ja',airco:'Ja',cam:'Ja',cruise:'Ja',lat:'Ja'};
 const EXT=['Rechtsvoor','Rechts','Rechtsachter','Achter','Linksachter','Links','Linksvoor','Voor'];
@@ -107,9 +111,9 @@ function form(){return fl().map(([k,l,t])=>{
  if(k==='S')return `<div class="sec">${l}</div>`;
  if(l==='#T')l=S.d.eenheid==='uur'?'Bedrijfsuren':'Tellerstand (km)';
  if(k==='vin')l='VIN-nummer';
- const inp=t==='b'?`<select data-k="${k}">${['','Ja','Nee'].map(o=>`<option value="${o}"${(S.d[k]||'')===o?' selected':''}>${o||'–'}</option>`).join('')}</select>`:`<input data-k="${k}" placeholder="${(PH()[k]||'').replace(/"/g,'&quot;')}" value="${(S.d[k]||'').replace(/"/g,'&quot;')}" ${k==='tellerstand'?'inputmode="numeric"':''}>`;
+ const inp=t==='b'?`<select data-k="${k}">${['','Ja','Nee'].map(o=>`<option value="${o}"${(S.d[k]||'')===o?' selected':''}>${o||'–'}</option>`).join('')}</select>`:`<input data-k="${k}" ${SAN[k]?'autocapitalize="characters" autocorrect="off" spellcheck="false" ':''}placeholder="${(PH()[k]||'').replace(/"/g,'&quot;')}" value="${(S.d[k]||'').replace(/"/g,'&quot;')}" ${k==='tellerstand'?'inputmode="numeric"':''}>`;
  return `<div class="row"><label>${l}</label><div class="fld">${inp}${t==='b'?'':PEN}</div></div>${k==='vin'||k==='chassisnummer'?'<div style="display:flex;gap:8px;margin:-4px 0 20px"><button class="cta" data-scan style="min-height:48px;font-size:14px;background:var(--panel);color:var(--tx)">SCAN MET CAMERA</button>'+(k==='vin'?'<button class="cta" data-lookup style="min-height:48px;font-size:14px">GEGEVENS OPHALEN</button>':'')+'</div>':''}`}).join('')}
-app.addEventListener('input',e=>{const k=e.target.dataset.k;if(k)S.d[k]=e.target.value;const a=e.target.dataset.a;if(a)S.ad[a]=e.target.value});
+app.addEventListener('input',e=>{const el=e.target,k=el.dataset.k;if(k){if(SAN[k]){const v=SAN[k](el.value);if(v!==el.value)el.value=v}S.d[k]=el.value;if((k==='vin'&&el.value.length===17)||(k==='kenteken'&&el.value.length===6))autofill()}const a=el.dataset.a;if(a)S.ad[a]=el.value});
 app.addEventListener('change',e=>{const k=e.target.dataset.k;if(k)S.d[k]=e.target.value;const a=e.target.dataset.a;if(a)S.ad[a]=e.target.value});
 app.addEventListener('click',async e=>{const t=e.target;
  if(t.dataset.scan!==undefined){scanVin();return}
@@ -133,7 +137,29 @@ function scanVin(){
   r.decodeFromConstraints({video:{facingMode:'environment',width:{ideal:1920}}},'sv',res=>{if(!res)return;const raw=res.getText();if(S.type==='van'){const m=raw.toUpperCase().replace(/[^A-Z0-9]/g,'').match(/[A-HJ-NPR-Z0-9]{17}/);if(m)ok(m[0]);else{const x=$('#svm');if(x)x.textContent='Geen geldig VIN gelezen, probeer opnieuw.'}}else ok(raw.trim())}).catch(fail);
  }catch(e){fail(e)}
 }
-async function fill(){if(!S.d.vin)S.d.vin=MOCK.vin;const r=await lookup('van',S.d.vin);Object.entries(r).forEach(([k,v])=>{if(!S.d[k])S.d[k]=v})}
+let busy=false;
+async function autofill(){if(busy)return;busy=true;const m=$('#msg');if(m)m.textContent='Gegevens ophalen...';try{await fill()}finally{busy=false}syncForm()}
+function syncForm(){app.querySelectorAll('[data-k]').forEach(i=>{const v=S.d[i.dataset.k]||'';if(i.value!==v)i.value=v});const m=$('#msg');if(m){m.textContent=S.msg||'';m.style.margin=S.msg?'0 0 16px':'0'}}
+async function fill(){
+ const d=S.d,got=[],cap=s=>s?s[0]+s.slice(1).toLowerCase():'',n=(x,u)=>x&&+x?x+' '+u:'',dt=s=>s&&s.length===8?s.slice(6)+'-'+s.slice(4,6)+'-'+s.slice(0,4):'',set=(k,v)=>{if(v&&!d[k])d[k]=String(v)},J=u=>fetch(u).then(r=>{if(!r.ok)throw 0;return r.json()});
+ S.msg='';
+ if(d.kenteken&&d.kenteken.length>=6){
+  try{
+   const k=d.kenteken,b='https://opendata.rdw.nl/resource/',[a,f]=await Promise.all([J(b+'m9d7-ebf2.json?kenteken='+k),J(b+'8ys7-d773.json?kenteken='+k).catch(()=>[])]),v=a[0];
+   if(v){
+    set('merk',v.merk);set('type',v.handelsbenaming);set('categorie',v.inrichting);set('kleur',cap(v.eerste_kleur));set('eerste_registratie',dt(v.datum_eerste_toelating));set('eenheid','km');
+    set('lengte',n(v.lengte,'cm'));set('breedte',n(v.breedte,'cm'));set('hoogte',n(v.hoogte_voertuig,'cm'));set('wielbasis',n(v.wielbasis,'cm'));
+    set('gvw',n(v.toegestane_maximum_massa_voertuig,'kg'));set('ledig',n(v.massa_ledig_voertuig,'kg'));
+    if(+v.toegestane_maximum_massa_voertuig&&+v.massa_rijklaar)set('laad',(v.toegestane_maximum_massa_voertuig-v.massa_rijklaar)+' kg');
+    const x=f[0];if(x){set('brandstof',x.brandstof_omschrijving);if(+x.nettomaximumvermogen)set('pk',Math.round(x.nettomaximumvermogen*1.36)+' PK');set('euro',x.uitlaatemissieniveau)}
+    got.push('RDW');
+   }else S.msg='Kenteken niet gevonden bij de RDW. ';
+  }catch(e){S.msg='RDW niet bereikbaar. '}
+ }
+ if(d.vin&&d.vin.length===17&&!d.merk){try{const r=await J('https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/'+d.vin+'?format=json'),x=r.Results&&r.Results[0];if(x&&x.Make){set('merk',x.Make);set('type',x.Model);got.push('VIN-decoder (beperkt)')}}catch(e){}}
+ if(got.length)S.msg='Gegevens opgehaald via '+got.join(' + ')+'. Controleer en vul aan.'+(d.kenteken?'':' Voer het kenteken in voor volledige gegevens.');
+ else S.msg=(S.msg||'Geen gegevens gevonden. ')+(d.kenteken?'':'Voer het kenteken in: de RDW kan niet op VIN zoeken.');
+}
 function agrid(){const ps=S.photos.map((p,n)=>[p,n]).filter(x=>x[0].url);return ps.length?ps.map(([p,n])=>{const j=S.ad.fotos.indexOf(n);return `<div data-p="${n}" class="${j>=0?'sel':''}"><img src="${p.url}">${j>=0?`<i>${j+1}</i>`:''}<span>${p.label}</span></div>`}).join(''):`<p class="note">Geen foto's in deze sessie.</p>`}
 function adscreen(){const A=S.ad;if(!A.fotos)A.fotos=S.photos.map((p,n)=>p.url?n:-1).filter(n=>n>=0).slice(0,8);
  const yn=k=>`<select data-a="${k}">${['Nee','Ja'].map(o=>`<option${(A[k]||'Nee')===o?' selected':''}>${o}</option>`).join('')}</select>`;
@@ -144,8 +170,8 @@ function stopCam(){if(S.stream){S.stream.getTracks().forEach(t=>t.stop());S.stre
 
 function draw(){
  if(S.step==='home')app.innerHTML=`<div class="scr"><div class="top"><h1>Incheck</h1></div><div class="body"><button class="new" id="new"><span>+</span>NIEUW VOERTUIG</button><h2 style="margin-top:28px">VORIGE SESSIES</h2>${S.sessions.map((s,n)=>`<button class="card" data-n="${n}"><div class="th" style="${s.photos[0]?`background-image:url(${s.photos[0].url})`:''}">${s.photos[0]?'':s.title.split(' ')[0].slice(0,3)}</div><div><b>${s.title}</b><small>${s.id}</small></div></button>`).join('')}</div></div>`,
-  $('#new').onclick=()=>{S.d={};S.ad={};S.id='';S.photos=[];S.i=0;S.edit=null;go('s1')},
-  app.querySelectorAll('.card').forEach(c=>c.onclick=()=>{const s=S.sessions[c.dataset.n];Object.assign(S,{type:s.type,id:s.id,d:{...s.d},photos:[...s.photos],ad:{...(s.ad||{}),fotos:s.ad&&s.ad.fotos?[...s.ad.fotos]:undefined},edit:+c.dataset.n});go('s4')});
+  $('#new').onclick=()=>{S.d={};S.ad={};S.msg='';S.id='';S.photos=[];S.i=0;S.edit=null;go('s1')},
+  app.querySelectorAll('.card').forEach(c=>c.onclick=()=>{const s=S.sessions[c.dataset.n];Object.assign(S,{type:s.type,id:s.id,d:{...s.d},photos:[...s.photos],msg:'',ad:{...(s.ad||{}),fotos:s.ad&&s.ad.fotos?[...s.ad.fotos]:undefined},edit:+c.dataset.n});go('s4')});
  else if(S.step==='s1'){
   app.innerHTML=`<div class="scr"><div class="top"><h1>Voertuig vastleggen</h1></div><div class="body"><div class="seg"><button data-t="van" class="${S.type==='van'?'on':''}">Bedrijfswagen (Van)</button><button data-t="machine" class="${S.type==='machine'?'on':''}">Machine (Machinery)</button></div>
   <h2 style="margin:0 0 8px">${S.type==='van'?'BV-nummer':'BM-nummer'}</h2><input class="big" id="id" placeholder="${S.type==='van'?'BV007963':'BM007963'}" value="${S.id}" autocapitalize="characters" maxlength="8">
@@ -154,7 +180,7 @@ function draw(){
   </div>
   <div class="foot"><button class="cta" id="go">START FOTOSESSIE</button></div></div>`;
   app.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{S.type=b.dataset.t;S.d={};S.id='';draw()});
-  $('#id').oninput=e=>S.id=e.target.value;
+  $('#id').oninput=e=>{e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'');S.id=e.target.value};
   
   $('#go').onclick=()=>{reqMotion();S.id=(S.id||(S.type==='van'?'BV007963':'BM007963')).toUpperCase();S.i=0;S.photos=[];go('cam')};
  }
@@ -166,7 +192,7 @@ function draw(){
   $('#more').onclick=()=>{reqMotion();S.i=-1;go('cam')};$('#fin').onclick=()=>go('s4');
  }
  else if(S.step==='s4'){
-  app.innerHTML=`<div class="scr"><div class="top"><h1>Gegevens controleren</h1></div><div class="body">${form()}</div><div class="foot"><button class="cta" id="ok">BEVESTIG GEGEVENS</button></div></div>`;
+  app.innerHTML=`<div class="scr"><div class="top"><h1>Gegevens controleren</h1></div><div class="body"><p class="note" id="msg" style="color:var(--or);margin:0 0 ${S.msg?16:0}px">${S.msg||''}</p>${form()}</div><div class="foot"><button class="cta" id="ok">BEVESTIG GEGEVENS</button></div></div>`;
   $('#ok').onclick=()=>go('ad');
  }
  else if(S.step==='ad'){
