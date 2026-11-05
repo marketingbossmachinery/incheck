@@ -106,16 +106,17 @@ machine:[...EXT,'Cabine','Bedieningspaneel','Urenteller (motor draait)','Motorru
 const S={step:'home',type:'van',id:'',d:{},ad:{},photos:[],i:0,stream:null,
  sessions:[['MAN TGE','BV007963',{merk:'MAN',type:'TGE'}],['Mercedes-Benz Sprinter','BV007958',{merk:'Mercedes-Benz',type:'Sprinter'}],['Ford Transit','BV007941',{merk:'Ford',type:'Transit'}],['VW Crafter','BV007902',{merk:'VW',type:'Crafter'}]].map(([t,id,o])=>({title:t,id,type:'van',d:{...MOCK,...o},photos:[]}))};
 
-// Mock van /api/vehicles/lookup
-async function lookup(type,id){await new Promise(r=>setTimeout(r,500));return type==='van'?{...MOCK,vin:''}:Object.fromEntries([...F.filter(f=>f[0]!=='S').map(f=>[f[0],f[2]?'Nee':'']),['eenheid','uur']]);}
+// Backend-route (Next.js: Vincario, dan RDW, dan lege template). Zonder backend, bijv. op statische hosting, valt de app terug op de RDW vanuit de browser.
+const API='/api/vehicles/lookup';
+
 
 function form(){return fl().map(([k,l,t])=>{
  if(k==='S')return `<div class="sec">${l}</div>`;
  if(l==='#T')l=S.d.eenheid==='uur'?'Bedrijfsuren':'Tellerstand (km)';
  if(k==='vin')l='VIN-nummer';
  const inp=t==='b'?`<select data-k="${k}">${['','Ja','Nee'].map(o=>`<option value="${o}"${(S.d[k]||'')===o?' selected':''}>${o||'–'}</option>`).join('')}</select>`:`<input data-k="${k}" ${SAN[k]?'autocapitalize="characters" autocorrect="off" spellcheck="false" ':''}placeholder="${(PH()[k]||'').replace(/"/g,'&quot;')}" value="${(S.d[k]||'').replace(/"/g,'&quot;')}" ${k==='tellerstand'?'inputmode="numeric"':''}>`;
- return `<div class="row"><label>${l}</label><div class="fld">${inp}${t==='b'?'':PEN}</div></div>${k==='vin'||k==='chassisnummer'?'<div style="display:flex;gap:8px;margin:-4px 0 20px"><button class="cta" data-scan style="min-height:48px;font-size:14px;background:var(--panel);color:var(--tx)">SCAN MET CAMERA</button>'+(k==='vin'?'<button class="cta" data-lookup style="min-height:48px;font-size:14px">GEGEVENS OPHALEN</button>':'')+'</div>':''}`}).join('')}
-app.addEventListener('input',e=>{const el=e.target,k=el.dataset.k;if(k){if(SAN[k]){const v=SAN[k](el.value);if(v!==el.value)el.value=v}S.d[k]=el.value;if((k==='vin'&&el.value.length===17)||(k==='kenteken'&&el.value.length===6))autofill()}const a=el.dataset.a;if(a)S.ad[a]=el.value});
+ return `<div class="row"><label>${l}</label><div class="fld">${inp}${t==='b'?'':PEN}</div></div>${k==='vin'||k==='chassisnummer'?'<div style="display:flex;gap:8px;margin:-4px 0 20px"><button class="cta" data-scan style="min-height:48px;font-size:14px;background:var(--panel);color:var(--tx)">SCAN MET CAMERA</button>'+'<button class="cta" data-lookup style="min-height:48px;font-size:14px">GEGEVENS OPHALEN</button>'+'</div>':''}`}).join('')}
+app.addEventListener('input',e=>{const el=e.target,k=el.dataset.k;if(k){if(SAN[k]){const v=SAN[k](el.value);if(v!==el.value)el.value=v}S.d[k]=el.value;if((k==='vin'&&el.value.length===17)||(k==='chassisnummer'&&el.value.length===17)||(k==='kenteken'&&el.value.length===6))autofill()}const a=el.dataset.a;if(a)S.ad[a]=el.value});
 app.addEventListener('change',e=>{const k=e.target.dataset.k;if(k)S.d[k]=e.target.value;const a=e.target.dataset.a;if(a)S.ad[a]=e.target.value});
 app.addEventListener('click',async e=>{const t=e.target;
  if(t.dataset.scan!==undefined){scanVin();return}
@@ -130,7 +131,7 @@ function scanVin(){
  app.appendChild(ov);
  const close=()=>{try{r&&r.reset()}catch(e){}ov.remove()};
  $('#svx').onclick=close;
- const ok=async txt=>{if(done)return;done=true;close();if(S.type==='van'){S.d.vin=txt;await fill()}else S.d.chassisnummer=txt;draw()};
+ const ok=async txt=>{if(done)return;done=true;close();if(S.type==='van')S.d.vin=txt;else S.d.chassisnummer=txt;await fill();draw()};
  const fail=e=>{const m=$('#svm');if(!m)return;m.innerHTML='Camera of scanner niet beschikbaar ('+(e&&e.name||e)+').<br>Typ het nummer in of gebruik de demo.';ov.querySelector('.foot').insertAdjacentHTML('afterbegin','<button class="cta" id="svd" style="margin-bottom:8px">DEMO-WAARDE INVULLEN</button>');$('#svd').onclick=()=>ok(S.type==='van'?'WMA03VUY6P9019536':'CAT0320GC12345')};
  try{
   const Z=window.ZXing,h=new Map();
@@ -142,7 +143,46 @@ function scanVin(){
 let busy=false;
 async function autofill(){if(busy)return;busy=true;const m=$('#msg');if(m)m.textContent='Gegevens ophalen...';try{await fill()}finally{busy=false}syncForm()}
 function syncForm(){app.querySelectorAll('[data-k]').forEach(i=>{const v=S.d[i.dataset.k]||'';if(i.value!==v)i.value=v});const m=$('#msg');if(m){m.textContent=S.msg||'';m.style.margin=S.msg?'0 0 16px':'0'}}
+const yn=v=>v===true?'Ja':v===false?'Nee':'';
+const UNIT={mm:.1,cm:1,m:100,in:2.54,ft:30.48,kg:1,lb:.45359237,lbs:.45359237,t:1000};
+// Vangnet: rekent '80 in' of '5000 lbs' om naar cm/kg (de backend doet dit ook al).
+function norm(s){const m=String(s==null?'':s).trim().match(/^([\d.,]+)\s*([a-z]+)$/i);if(!m)return s||'';const u=m[2].toLowerCase(),f=UNIT[u];if(!f)return s;return Math.round(parseFloat(m[1].replace(',','.'))*f)+' '+(/^(kg|lbs?|t)$/.test(u)?'kg':'cm')}
+// Zet het standaard datamodel (basis_informatie, gewichten, ...) om naar de platte velden van het formulier.
+function applyVehicle(v){
+ const d=S.d,b=v.basis_informatie||{},m=v.afmetingen_en_maten||{},w=v.gewichten||{},t=v.motor_en_technisch||{},o=v.opties_en_kenmerken||{};
+ const set=(k,x)=>{if(x!=null&&x!==''&&!d[k])d[k]=String(x)};
+ set('eenheid',b.meet_eenheid);set('merk',b.merk);set('type',b.type);set('categorie',b.categorie);set('brandstof',b.brandstof);set('conditie',b.conditie);
+ if(S.type==='van'){
+  set('model',b.model);set('eerste_registratie',b.eerste_registratie);set('kleur',b.kleur);set('tellerstand',b.tellerstand);set('btw_marge',b.btw_marge);
+  set('lengte',norm(m.lengte));set('breedte',norm(m.breedte));set('hoogte',norm(m.hoogte));set('wielbasis',norm(m.wielbasis));
+  set('gvw',norm(w.max_toegelaten_gewicht_gvw));set('ledig',norm(w.ledig_gewicht));set('laad',norm(w.laadvermogen));set('trek',norm(w.trekgewicht));
+  set('bak',t.versnellingsbak);set('pk',t.vermogen);set('euro',t.emissieklasse);set('adblue',yn(t.adblue));
+  set('airco',yn(o.airco));set('cam',yn(o.achteruitrijcamera));set('cruise',yn(o.cruise_control));set('lat',yn(o.lat_betimmering));
+ }else{
+  const y=String(b.eerste_registratie||'').match(/\d{4}$/);if(y)set('bouwjaar',y[0]);
+  set('vermogen',t.vermogen);set('gewicht',norm(w.ledig_gewicht||w.max_toegelaten_gewicht_gvw));
+  set('t_lengte',norm(m.lengte));set('t_breedte',norm(m.breedte));set('t_hoogte',norm(m.hoogte));
+ }
+}
 async function fill(){
+ const d=S.d,id=(S.type==='van'?d.vin:d.chassisnummer)||'',plate=d.kenteken||'';
+ S.msg='';
+ if(!id&&!plate){S.msg=S.type==='van'?'Voer het VIN of kenteken in.':'Voer het chassisnummer in.';return}
+ try{
+  const r=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({identifier:id,kenteken:plate,type:S.type})});
+  if(r.ok&&(r.headers.get('content-type')||'').includes('json')){
+   const v=await r.json();
+   if(v&&v.bron){
+    applyVehicle(v);
+    const n=(v.notes||[]).join('. ');
+    S.msg=v.bron==='template'?(n?n+'. ':'')+'Geen gegevens gevonden, vul de velden zelf in.':'Gegevens opgehaald via '+(v.bron==='vincario'?'Vincario':'RDW')+'. Controleer en vul aan.'+(n?' ('+n+')':'');
+    return;
+   }
+  }
+ }catch(e){}
+ await fillClient();
+}
+async function fillClient(){
  const d=S.d,got=[],cap=s=>s?s[0]+s.slice(1).toLowerCase():'',n=(x,u)=>x&&+x?x+' '+u:'',dt=s=>s&&s.length===8?s.slice(6)+'-'+s.slice(4,6)+'-'+s.slice(0,4):'',set=(k,v)=>{if(v&&!d[k])d[k]=String(v)},J=u=>fetch(u).then(r=>{if(!r.ok)throw 0;return r.json()});
  S.msg='';
  if(d.kenteken&&d.kenteken.length>=6){
@@ -170,15 +210,16 @@ function adscreen(){const A=S.ad;if(!A.fotos)A.fotos=S.photos.map((p,n)=>p.url?n
 function go(s){stopCam();S.step=s;draw()}
 function stopCam(){if(S.stream){S.stream.getTracks().forEach(t=>t.stop());S.stream=null}clearInterval(S.lv);window.removeEventListener('devicemotion',S.ori)}
 
-function draw(){
+function draw(){draw0();addBack()}
+function draw0(){
  if(S.step==='home')app.innerHTML=`<div class="scr"><div class="top"><h1>Incheck</h1></div><div class="body"><button class="new" id="new"><span>+</span>NIEUW VOERTUIG</button><h2 style="margin-top:28px">VORIGE SESSIES</h2>${S.sessions.map((s,n)=>`<button class="card" data-n="${n}"><div class="th" style="${s.photos[0]?`background-image:url(${s.photos[0].url})`:''}">${s.photos[0]?'':s.title.split(' ')[0].slice(0,3)}</div><div><b>${s.title}</b><small>${s.id}</small></div></button>`).join('')}</div></div>`,
   $('#new').onclick=()=>{S.d={};S.ad={};S.msg='';S.id='';S.photos=[];S.i=0;S.edit=null;go('s1')},
   app.querySelectorAll('.card').forEach(c=>c.onclick=()=>{const s=S.sessions[c.dataset.n];Object.assign(S,{type:s.type,id:s.id,d:{...s.d},photos:[...s.photos],msg:'',ad:{...(s.ad||{}),fotos:s.ad&&s.ad.fotos?[...s.ad.fotos]:undefined},edit:+c.dataset.n});go('s4')});
  else if(S.step==='s1'){
-  app.innerHTML=`<div class="scr"><div class="top"><h1>Voertuig vastleggen</h1></div><div class="body"><div class="seg"><button data-t="van" class="${S.type==='van'?'on':''}">Bedrijfswagen (Van)</button><button data-t="machine" class="${S.type==='machine'?'on':''}">Machine (Machinery)</button></div>
+  app.innerHTML=`<div class="scr"><div class="top"><h1>Voertuig vastleggen</h1></div><div class="body"><div class="seg"><button data-t="van" class="${S.type==='van'?'on':''}">Van</button><button data-t="machine" class="${S.type==='machine'?'on':''}">Machine</button></div>
   <h2 style="margin:0 0 8px">${S.type==='van'?'BV-nummer':'BM-nummer'}</h2><input class="big" id="id" placeholder="${S.type==='van'?'BV007963':'BM007963'}" value="${S.id}" autocapitalize="characters" maxlength="8">
   
-  <p class="note">Voer het ${S.type==='van'?'BV':'BM'}-nummer in, of laat leeg voor een demo. De voertuiggegevens vul je pas na de fotosessie in. Bij een Van worden ze opgezocht met het VIN.</p>
+  <p class="note">Voer het ${S.type==='van'?'BV':'BM'}-nummer in, of laat leeg voor een demo. Na de fotosessie vul je ${S.type==='van'?'het VIN of kenteken':'het chassisnummer'} in. De gegevens worden dan automatisch opgehaald.</p>
   </div>
   <div class="foot"><button class="cta" id="go">START FOTOSESSIE</button></div></div>`;
   app.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{S.type=b.dataset.t;S.d={};S.id='';draw()});
@@ -210,7 +251,7 @@ function draw(){
 
 async function cam(){
  const seq=SEQ[S.type],extra=S.i===-1,label=extra?'Extra foto':seq[S.i];
- app.innerHTML=`<div class="cam"><div class="side"><button class="skip" id="skip">${extra?'TERUG':'SKIP'}</button></div><div class="vf" id="vf"><video id="v" playsinline muted autoplay></video><div class="sim" id="sim">Camera niet beschikbaar in deze preview.<br>De sluiter maakt een demo-foto.</div><div class="lbl">${label}</div>${typeof DeviceMotionEvent!=='undefined'&&DeviceMotionEvent.requestPermission&&S.motion!=='granted'?'<button id="mot" class="cta" style="position:absolute;left:12%;right:12%;bottom:44px;min-height:44px;width:auto;font-size:14px">WATERPAS ACTIVEREN</button>':''}<div class="lvl" id="lvl"><span id="lst" style="position:absolute;left:50%;top:-24px;transform:translateX(-50%);font-size:12px;background:#000a;padding:2px 8px;border-radius:6px;white-space:nowrap"></span><i></i><b id="lb"></b></div></div><div class="side"><button class="shut" id="shut" aria-label="Foto maken"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button></div><button class="x" id="x">✕</button>${extra?'':`<div class="prog">${S.i+1} / ${seq.length}</div>`}</div>`;
+ app.innerHTML=`<div class="cam"><div class="side">${extra?'':'<button class="skip" id="prev" aria-label="Vorige foto">←</button>'}<button class="skip" id="skip">${extra?'TERUG':'SKIP'}</button></div><div class="vf" id="vf"><video id="v" playsinline muted autoplay></video><div class="sim" id="sim">Camera niet beschikbaar in deze preview.<br>De sluiter maakt een demo-foto.</div><div class="lbl">${label}</div>${typeof DeviceMotionEvent!=='undefined'&&DeviceMotionEvent.requestPermission&&S.motion!=='granted'?'<button id="mot" class="cta" style="position:absolute;left:12%;right:12%;bottom:44px;min-height:44px;width:auto;font-size:14px">WATERPAS ACTIVEREN</button>':''}<div class="lvl" id="lvl"><span id="lst" style="position:absolute;left:50%;top:-24px;transform:translateX(-50%);font-size:12px;background:#000a;padding:2px 8px;border-radius:6px;white-space:nowrap"></span><i></i><b id="lb"></b></div></div><div class="side"><button class="shut" id="shut" aria-label="Foto maken"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button></div><button class="x" id="x">✕</button>${extra?'':`<div class="prog">${S.i+1} / ${seq.length}</div>`}</div>`;
  const v=$('#v');
  try{S.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1440}},audio:false});v.srcObject=S.stream;$('#sim').style.display='none'}catch(e){v.style.display='none';$('#sim').innerHTML='Camera geblokkeerd ('+(e.name||e)+').<br>De sluiter maakt een demo-foto.'}
  // waterpas: echte sensor als die data geeft, anders demo-beweging
@@ -221,24 +262,19 @@ async function cam(){
  $('#x').onclick=()=>{if(confirm('Sessie annuleren? Gemaakte foto\'s gaan verloren.'))go('home')};
  const next=p=>{if(extra){S.photos.push(p);go('s3');return}S.photos.push(p);S.i++;S.i>=seq.length?go('s3'):cam()};
  $('#skip').onclick=()=>extra?go('s3'):(stopCam(),next({label}));
+ const pv=$('#prev');if(pv)pv.onclick=()=>{stopCam();if(S.i===0)go('s1');else{S.i--;S.photos.pop();cam()}};
  $('#shut').onclick=()=>{const c=document.createElement('canvas');c.width=1600;c.height=1200;const g=c.getContext('2d');
   if(S.stream&&v.videoWidth){const vw=v.videoWidth,vh=v.videoHeight,w=Math.min(vw,vh*4/3),h=w*3/4;g.drawImage(v,(vw-w)/2,(vh-h)/2,w,h,0,0,1600,1200)}
   else{g.fillStyle=`hsl(${S.photos.length*37%360} 12% 22%)`;g.fillRect(0,0,1600,1200);g.fillStyle='#fff8';g.font='bold 80px sans-serif';g.textAlign='center';g.fillText(label,800,620)}
   const url=c.toDataURL('image/jpeg',.8),tilt=S.tilt;stopCam();next({label,url,tilt})};
 }
 const BACK={
-  s1:()=>go('home'),
-  s3:()=>{const n=SEQ[S.type].length;S.photos.pop();S.i=S.photos.length>=n?-1:S.photos.length;go('cam')},
-  s4:()=>go('s3'),
-  ad:()=>go('s4')
+ s1:()=>go('home'),
+ s3:()=>{const n=SEQ[S.type].length;S.photos.pop();S.i=S.photos.length>=n?-1:S.photos.length;go('cam')},
+ s4:()=>go('s3'),
+ ad:()=>go('s4')
 };
-function addBack(){
-  const t=app.querySelector('.top'),f=BACK[S.step];
-  if(!t||!f)return;
-  t.insertAdjacentHTML('beforeend','<button id="back" aria-label="Terug">←</button>');
-  $('#back').onclick=f;
-}
-const d0=draw;draw=()=>{d0();addBack()};
+function addBack(){const t=app.querySelector('.top'),f=BACK[S.step];if(!t||!f)return;t.insertAdjacentHTML('beforeend','<button id="back" aria-label="Terug">←</button>');$('#back').onclick=f}
 draw();
 </script>
 </body>
