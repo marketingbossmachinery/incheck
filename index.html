@@ -161,12 +161,14 @@ function applyDbRec(rec){S.type=rec.type;S.sub=rec.sub||0;S.d={...rec.d};S.src={
  S.msg='Gegevens uit de database ('+Object.keys(rec.d).length+' velden, ingecheckt op '+new Date(rec.at).toLocaleDateString('nl-NL')+').'+(rec.vinOk?'':' VIN-gegevens ontbraken bij de incheck: haal ze alsnog op.')}
 const vinKey=()=>S.type==='van'?'ID_VIN':'chassisnummer';
 const vinOk=()=>(S.d[vinKey()]||'').length===17&&Object.values(S.src).some(x=>/Vincario|RDW/.test(x));
-function vokState(){if(S.step!=='vin')return;
- const ok=vinOk(),n=Object.keys(S.src).length;
+function vokState(full){if(S.step!=='vin')return;
+ const ok=vinOk(),n=Object.keys(S.src).length,R=S.raw.vincario;
  [vinKey(),'ID_PLATE'].forEach(k=>{const i=$('[data-k="'+k+'"]');if(i&&i!==document.activeElement&&i.value!==(S.d[k]||''))i.value=S.d[k]||''});
  const lb=$('[data-lookup]');if(lb)lb.textContent='GEGEVENS OPHALEN';
- const nm=(S.type==='van'?[S.d.ID_MAKE,S.d.ID_MODEL,S.d.ID_TYPE]:[S.d.merk,S.d.type]).filter(Boolean).join(' ');
- $('#vstat').innerHTML=(S.msg?`<p class="note" style="color:var(--or)">${esc(S.msg)}</p>`:'')+(ok?`<p class="note"><b style="color:var(--gr)">✓ ${n} velden opgehaald</b><br>${esc(nm)}</p>`:'')+(S.vinTried&&!ok?'<button class="cta sm alt" id="vforce">TOCH DOORGAAN (zonder VIN-gegevens)</button>':'')+rawBlock();
+ const cnt={};Object.values(S.src).forEach(x=>{x=x.replace(/ \(.*\)/,'');cnt[x]=(cnt[x]||0)+1});
+ $('#vcount').innerHTML=`<div class="bar" style="margin:0 0 16px;padding:12px;background:var(--panel);border-radius:10px"><span><b style="font-size:20px;color:${n?'var(--gr)':'var(--mute)'}">${n}</b> velden opgehaald</span><span style="text-align:right;font-size:12px">${Object.entries(cnt).map(([x,c])=>esc(x)+' '+c).join(' · ')}${R?'<br>Vincario leverde '+R.length+' gegevens':''}</span></div>`;
+ $('#vstat').innerHTML=(S.msg?`<p class="note" style="color:var(--or)">${esc(S.msg)}</p>`:'')+(S.vinTried&&!ok?'<button class="cta sm alt" id="vforce" style="margin-bottom:16px">TOCH DOORGAAN (zonder VIN-gegevens)</button>':'');
+ if(full!==false){const bd=$('.body'),y=bd?bd.scrollTop:0;$('#vform').innerHTML=s4body(true);if(bd)bd.scrollTop=y}
  const nx=$('#vnext');if(nx)nx.disabled=!ok}
 async function loadDbId(id){const rec=await dbGet(id);if(!rec)return;reset();S.flow='ad';S.id=rec.id;applyDbRec(rec);go('s1')}
 function dbList(){dbAll().then(a=>{const el=$('#dbl');if(!el||!a.length)return;a.sort((x,y)=>(y.at||'').localeCompare(x.at||''));
@@ -187,17 +189,18 @@ function row(c){
   inp=`<input data-k="${c}" ${isD?'type="date" ':''}${isN?'inputmode="decimal" ':''}${SAN[c]?'autocapitalize="characters" autocorrect="off" spellcheck="false" ':''}placeholder="${esc(EXV[c]||'')}" value="${esc(v)}">${isD?'':PEN}`}
  return `<div class="row"><label data-h="${c}" class="${f.r==='V'?'req':''}">${esc(LABEL[c]||f.l)}${sm?`<small>${esc(sm)}</small>`:''}</label><div class="fld">${inp}</div><div class="hint" id="h-${c}">${esc(f.i||'Geen aanvullende instructie.')}${f.h?`<br>Hexon: ${esc(f.h)}`:''}</div></div>`}
 const BTNS='<div class="btns"><button class="cta sm alt" data-scan>SCAN MET CAMERA</button><button class="cta sm" data-lookup>GEGEVENS OPHALEN</button></div>';
-function vanForm(){
+function vanForm(iv){
  let tot=0,done=0,html='';
  for(const sec of sub().s){
   if(sec.m==='Publicatie')continue; // staat op het adverteerscherm
-  const cs=sec.f.filter(c=>vis(c,sec.m)&&!(S.onlyV&&FLD[c].r!=='V'));
+  const cs=sec.f.filter(c=>vis(c,sec.m)&&!(S.onlyV&&FLD[c].r!=='V')&&!(iv&&(c==='ID_VIN'||c==='ID_PLATE')));
   if(!cs.length)continue;
   let a=0,b=0;cs.forEach(c=>{if(FLD[c].r==='V'){b++;if(S.d[c])a++}});tot+=b;done+=a;
   const op=!!S.open[sec.m];
   html+=`<details class="mod" data-m="${esc(sec.m)}"${op?' open':''}><summary><span><i class="ar"></i>${esc(sec.m)}</span><span class="cnt${b&&a===b?' ok':''}">${b?a+'/'+b:''}</span></summary><div class="mb">${cs.map(c=>row(c)+(c==='ID_PLATE'&&!S.fromIncheck?BTNS:'')).join('')}</div></details>`}
  return {html,tot,done}}
-function machForm(){return FM.map(([k,l,t])=>{
+function machForm(iv){return FM.map(([k,l,t])=>{
+ if(iv&&k==='chassisnummer')return '';
  if(k==='S')return `<div class="sec">${l}</div>`;
  const v=S.d[k]||'',inp=t==='b'?`<select data-k="${k}">${['','Ja','Nee'].map(o=>`<option value="${o}"${v===o?' selected':''}>${o||'–'}</option>`).join('')}</select>`:`<input data-k="${k}" ${SAN[k]?'autocapitalize="characters" autocorrect="off" spellcheck="false" ':''}placeholder="${esc(EX[k]||'')}" value="${esc(v)}">`;
  return `<div class="row"><label>${l}</label><div class="fld">${inp}${t==='b'?'':PEN}</div></div>${k==='chassisnummer'&&!S.fromIncheck?BTNS:''}`}).join('')}
@@ -207,12 +210,12 @@ function rawText(){const R=S.raw,o=[];
  if(R.rdwFuel&&R.rdwFuel.length)o.push('== RDW brandstof ==',...Object.entries(R.rdwFuel[0]).map(([k,v])=>k+' = '+v));
  return o.join('\n')}
 function rawBlock(){const t=rawText();return t?`<details class="mod" style="margin-top:20px"><summary><span><i class="ar"></i>Brondata (voor test)</span></summary><div class="mb"><button class="cta sm alt" data-copy style="margin-bottom:12px">KOPIEER</button><pre class="raw">${esc(t)}</pre></div></details>`:''}
-function s4body(){
- const msg=`<p class="note" id="msg" style="color:var(--or);margin:0 0 ${S.msg?16:0}px">${esc(S.msg)}</p>`;
- if(S.type!=='van')return msg+machForm()+rawBlock();
- const A=vanForm();
+function s4body(iv){
+ const msg=iv?'':`<p class="note" id="msg" style="color:var(--or);margin:0 0 ${S.msg?16:0}px">${esc(S.msg)}</p>`;
+ if(S.type!=='van')return msg+machForm(iv)+rawBlock();
+ const A=vanForm(iv);
  return msg+`<div class="row"><label>Soort voertuig</label><div class="fld"><select id="sub">${SUBS.map((s,i)=>`<option value="${i}"${i===S.sub?' selected':''}>${esc(s.n)}</option>`).join('')}</select></div></div><div class="bar"><span>Verplicht ingevuld: <b>${A.done}</b> van ${A.tot}</span><button id="onlyv" class="tog${S.onlyV?' on':''}">Alleen verplicht</button></div>`+A.html+rawBlock()}
-function refresh(){if(S.step==='vin'){vokState();return}if(S.step!=='s4')return;const b=$('.body');if(!b)return;const y=b.scrollTop;b.innerHTML=s4body();b.scrollTop=y}
+function refresh(){if(S.step==='vin'){vokState(true);return}if(S.step!=='s4')return;const b=$('.body');if(!b)return;const y=b.scrollTop;b.innerHTML=s4body();b.scrollTop=y}
 
 // ---------- adverteren
 const agrid=()=>{const ps=S.photos.map((p,n)=>[p,n]).filter(x=>x[0].url);return ps.length?ps.map(([p,n])=>{const j=S.ad.fotos.indexOf(n);return `<div data-p="${n}" class="${j>=0?'sel':''}"><img src="${p.url}">${j>=0?`<i>${j+1}</i>`:''}<span>${p.label}</span></div>`}).join(''):`<p class="note">Geen foto's in deze sessie.</p>`};
@@ -225,7 +228,7 @@ function adscreen(){const A=S.ad;if(!A.fotos)A.fotos=S.photos.map((p,n)=>p.url?n
 app.addEventListener('input',e=>{const el=e.target,k=el.dataset.k,a=el.dataset.a;
  if(k){if(SAN[k]){const v=SAN[k](el.value);if(v!==el.value)el.value=v}S.d[k]=el.value;delete S.src[k];
   if(k==='ID_VIN'||k==='chassisnummer')S.vinTried=0;
-  if(S.step==='vin')vokState();
+  if(S.step==='vin')vokState(false);
   if(!S.fromIncheck&&((k==='ID_VIN'||k==='chassisnummer')&&el.value.length===17||(k==='ID_PLATE'||k==='kenteken')&&el.value.length===6))autofill()}
  if(a)S.ad[a]=el.value});
 app.addEventListener('change',e=>{const el=e.target,k=el.dataset.k,a=el.dataset.a;
@@ -249,7 +252,7 @@ app.addEventListener('toggle',e=>{const d=e.target;if(!(d.dataset&&d.dataset.m))
 
 // ---------- gegevensbronnen: 1 Neo, 2 VIN-checker (Vincario), 3 RDW (kenteken). Eerder ingevulde velden worden nooit overschreven.
 const put=(c,x,s)=>{if(x==null)return;x=String(x).trim();if(!x||x==='NaN'||S.d[c])return;S.d[c]=x;S.src[c]=s};
-const num=(x,f=1)=>{const n=parseFloat(String(x==null?'':x).replace(',','.'));return isFinite(n)&&n>0?String(Math.round(n*f)):''};
+const num=(x,f=1)=>{let t=String(x==null?'':x).trim();if(/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t))t=t.replace(/,/g,'');const n=parseFloat(t.replace(',','.'));return isFinite(n)&&n>0?String(Math.round(n*f)):''};
 const isoD=s=>/^\d{8}$/.test(s||'')?s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6):'';
 const TC=s=>String(s||'').toLowerCase().replace(/(^|[\s\-\/])([a-z])/g,(m,a,b)=>a+b.toUpperCase());
 const nrm=s=>String(s).toLowerCase().replace(/\([^)]*\)/g,' ').replace(/[^a-z0-9]+/g,' ').trim();
@@ -276,20 +279,34 @@ async function vinRows(vin){
  const j=await r.json(),rows=j.decode||[];if(!rows.length)return 'notfound';
  return S.cache[vin]=rows}
 // [veldcode, labelvarianten (genormaliseerd), soort]
-const VM=[['ID_MAKE',['make'],'s'],['ID_MODEL',['model'],'s'],['ID_TYPE',['vehicle specification'],'s'],['ID_MODELYEAR',['model year'],'n'],
+const COL_EN={white:'Wit',black:'Zwart',grey:'Grijs',gray:'Grijs',silver:'Zilver',blue:'Blauw',red:'Rood',green:'Groen',yellow:'Geel',orange:'Oranje',brown:'Bruin'};
+const VM=[['ID_MAKE',['make'],'s'],['ID_MODEL',['model'],'s'],['ID_YEAR',['made'],'y'],['ID_MODELYEAR',['model year'],'n'],['ID_YEAR',['model year'],'n'],['ID_FIRSTREG',['registered'],'d'],
+['DIM_COLOR',['color','colour'],'col'],['DIM_STEER',['steering'],'st'],
 ['DIM_LENGTH',['length'],'mm'],['DIM_WIDTH',['width'],'mm'],['DIM_HEIGHT',['height'],'mm'],['DIM_WHEELBASE',['wheelbase array','wheelbase'],'mm'],
 ['DIM_EMPTY',['weight empty'],'kg'],['DIM_GVW',['max weight','gross vehicle weight'],'kg'],['DIM_TOWUNBRAKED',['permitted trailer load without brakes'],'kg'],['DIM_TOWBRAKED',['permitted trailer load with brakes'],'kg'],
 ['DIM_SEATS',['number of seats','seats'],'n'],['DIM_DOORS',['number of doors','doors'],'n'],
 ['ENG_ENERGY',['fuel type primary'],'en'],['ENG_POWER',['engine power','power'],'kw'],['ENG_MODEL',['engine code','engine model'],'s'],['ENG_GEARBOX',['transmission','gearbox'],'gb'],['ENG_GEARS',['number of gears'],'n'],['ENG_DRIVE',['drive'],'dr'],
-['ICE_CC',['engine displacement'],'n'],['ICE_CYL',['number of cylinders','cylinders','engine cylinders'],'n'],['ICE_EURO',['emission standard'],'s'],['ICE_TANK',['fuel tank capacity','fuel capacity'],'n']];
-const VMM=[['merk',['make'],'s'],['type',['model'],'s'],['bouwjaar',['model year'],'n']];
+['ICE_CC',['engine displacement'],'n'],['ICE_CYL',['engine cylinders','number of cylinders','cylinders'],'n'],['ICE_EURO',['emission standard'],'s'],['ICE_TANK',['fuel capacity','fuel tank capacity'],'n'],['ICE_CO2',['co2 emission'],'n'],['ICE_CONS',['fuel consumption combined'],'f']];
+const VMM=[['merk',['make'],'s'],['type',['model'],'s'],['bouwjaar',['made'],'y'],['bouwjaar',['model year'],'n'],['brandstof',['fuel type primary'],'en'],['motor_type',['engine code','engine model'],'s'],['cilinders',['engine cylinders','number of cylinders'],'n'],['gewicht',['weight empty'],'kgt'],['vermogen',['engine power'],'kwt']];
 function applyVin(rows){S.raw.vincario=rows;
  const R=rows.map(r=>({n:nrm(r.label),u:((r.label.match(/\(([^)]*)\)/)||[])[1]||'').toLowerCase(),v:Array.isArray(r.value)?r.value[0]:r.value}));
  const find=al=>{for(const a of al){const m=R.filter(r=>r.n===a&&r.v!=null&&r.v!=='');if(m.length)return m}return[]};
- const K={s:m=>String(m[0].v).trim(),n:m=>num(m[0].v),mm:m=>num(m[0].v,{mm:.1,cm:1,m:100,in:2.54}[m[0].u]||.1),kg:m=>num(m[0].v,{kg:1,lb:.4536,lbs:.4536,t:1000,g:.001}[m[0].u]||1),
-  kw:m=>{const k=m.find(x=>x.u==='kw');return k?num(k.v):num(m[0].v,{hp:.7355,ps:.7355,pk:.7355,bhp:.7355}[m[0].u]||1)},en:m=>mapEn(m[0].v),gb:m=>mapGb(m[0].v),dr:m=>mapDr(m[0].v)};
+ const kwv=m=>{const k=m.find(x=>x.u==='kw');return k?num(k.v):num(m[0].v,{hp:.7355,ps:.7355,pk:.7355,bhp:.7355}[m[0].u]||1)};
+ const K={s:m=>String(m[0].v).trim(),n:m=>num(m[0].v),f:m=>{const n=parseFloat(String(m[0].v).replace(',','.'));return isFinite(n)&&n>0?String(Math.round(n*10)/10):''},
+  y:m=>{const x=String(m[0].v).slice(0,4);return /^(19|20)\d\d$/.test(x)?x:''},d:m=>{const x=String(m[0].v).slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(x)?x:''},
+  mm:m=>num(m[0].v,{mm:.1,cm:1,m:100,in:2.54}[m[0].u]||.1),kg:m=>num(m[0].v,{kg:1,lb:.4536,lbs:.4536,t:1000,g:.001}[m[0].u]||1),
+  kw:kwv,en:m=>mapEn(m[0].v),gb:m=>mapGb(m[0].v),dr:m=>mapDr(m[0].v),
+  col:m=>{const v=String(m[0].v).toLowerCase(),k=Object.keys(COL_EN).find(x=>v.includes(x));return k?COL_EN[k]:''},
+  st:m=>{const v=String(m[0].v).toLowerCase();return /left/.test(v)?'Links':/right/.test(v)?'Rechts':/cent|mid/.test(v)?'Midden':''},
+  kgt:m=>{const n=num(m[0].v);return n?n+' kg':''},kwt:m=>{const n=kwv(m);return n?n+' kW':''}};
  (S.type==='van'?VM:VMM).forEach(([c,al,k])=>{const m=find(al);if(m.length)put(c,K[k](m),'Vincario')});
- if(S.type==='van'&&!S.d.ID_TYPE&&S.d.ID_MODEL){const p=[S.d.ID_MODEL];if(S.d.ICE_CC)p.push((S.d.ICE_CC/1000).toFixed(1));if(S.d.ENG_POWER)p.push(Math.round(S.d.ENG_POWER*1.36)+' PK');put('ID_TYPE',p.join(' '),'Vincario (voorstel)')}}
+ if(S.type==='van'){
+  if(!S.d.DIM_COLOR){const m=find(['color','colour']);if(m.length)put('DIM_COLORNAME',TC(m[0].v),'Vincario')}
+  const gv=+S.d.DIM_GVW,em=+S.d.DIM_EMPTY;if(gv&&em&&gv>em)put('DIM_PAYLOAD',gv-em,'Vincario (berekend)');
+  if(/^(Diesel|Benzine|CNG|LPG|LNG)$/.test(S.d.ENG_ENERGY||'')&&S.d.ENG_POWER)put('ICE_POWER',S.d.ENG_POWER,'Vincario');
+  if(S.d.ID_MODEL){const hp=R.find(r=>r.n==='engine power'&&/^(hp|ps|pk|bhp)$/.test(r.u)),pk=hp?num(hp.v):(S.d.ENG_POWER?String(Math.round(S.d.ENG_POWER*1.36)):'');
+   const p=[];if(S.d.ICE_CC)p.push((S.d.ICE_CC/1000).toFixed(1));if(S.d.ENG_ENERGY)p.push(S.d.ENG_ENERGY);if(pk)p.push(pk+' PK');
+   if(p.length>1)put('ID_TYPE',p.join(' '),'Vincario (voorstel)');else{const sp=find(['vehicle specification']);if(sp.length)put('ID_TYPE',TC(sp[0].v),'Vincario')}}}}
 // RDW (open data, op kenteken)
 async function rdwClient(k){
  const B='https://opendata.rdw.nl/resource/',J=u=>fetch(u).then(r=>{if(!r.ok)throw new Error('RDW '+r.status);return r.json()});
@@ -398,17 +415,17 @@ function draw0(){
  }
  else if(S.step==='vin'){
   const van=S.type==='van',key=vinKey(),pl=van?`<h2 style="margin:8px 0 8px">Kenteken (voor de RDW)</h2><input class="big" data-k="ID_PLATE" placeholder="AB123C" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="8" value="${esc(S.d.ID_PLATE||'')}">`:'';
-  app.innerHTML=`<div class="scr"><div class="top"><h1>VIN-gegevens</h1></div><div class="body"><p class="note">Verplicht: haal de gegevens van het voertuig nu op, zodat de specificaties al in het systeem staan. Bij het adverteren worden ze uit de database gehaald.</p>
+  app.innerHTML=`<div class="scr"><div class="top"><h1>VIN-gegevens</h1></div><div class="body"><div id="vcount"></div><p class="note">Verplicht: haal de gegevens van het voertuig nu op, zodat de specificaties al in het systeem staan. Bij het adverteren worden ze uit de database gehaald.</p>
   <h2 style="margin:0 0 8px">${van?'VIN':'Chassisnummer'} (17 tekens)</h2><input class="big" data-k="${key}" placeholder="${van?'WF0XXXTTGXJU12345':'CAT0320GC12345'}" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="17" value="${esc(S.d[key]||'')}">${pl}
-  <div class="btns"><button class="cta sm alt" data-scan>SCAN MET CAMERA</button><button class="cta sm" data-lookup>GEGEVENS OPHALEN</button></div><div id="vstat"></div></div>
+  <div class="btns"><button class="cta sm alt" data-scan>SCAN MET CAMERA</button><button class="cta sm" data-lookup>GEGEVENS OPHALEN</button></div><div id="vstat"></div><div id="vform"></div></div>
   <div class="foot"><button class="cta" id="vnext" disabled>VERDER</button></div></div>`;
-  vokState();
+  vokState(true);
  }
  else if(S.step==='clean'){
   const ch=(k,l,o)=>`<h2 style="margin:0 0 8px">${l}</h2><div class="seg big" style="margin-bottom:28px">${o.map(x=>`<button data-pick="${k}:${x}" class="${S.clean[k]===x?'on':''}">${x}</button>`).join('')}</div>`;
   app.innerHTML=`<div class="scr"><div class="top"><h1>Cabine en stickers</h1></div><div class="body">${ch('cab','Cabine',['Schoon','Poetsen'])}${ch('stk','Stickers',['Schoon','Ontstickeren'])}</div><div class="foot"><button class="cta" id="cfin"${S.clean.cab&&S.clean.stk?'':' disabled'}>INCHECK AFRONDEN</button></div></div>`;
   $('#cfin').onclick=async()=>{if(!(S.clean.cab&&S.clean.stk))return;
-   const rec={id:S.id||'-',type:S.type,sub:S.sub,d:{...S.d},src:{...S.src},photos:S.photos.filter(p=>p.url),clean:{...S.clean},vinOk:vinOk(),at:new Date().toISOString()};
+   const rec={id:S.id||'-',type:S.type,sub:S.sub,d:{...S.d},src:{...S.src},photos:S.photos.filter(p=>p.url),clean:{...S.clean},vinOk:vinOk(),raw:S.raw.vincario||null,at:new Date().toISOString()};
    await dbPut(rec);go('s5')};
  }
  else if(S.step==='s4'){
